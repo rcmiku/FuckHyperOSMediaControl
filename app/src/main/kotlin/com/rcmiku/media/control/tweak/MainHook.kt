@@ -129,6 +129,7 @@ class MainHook : IXposedHookZygoteInit, IXposedHookLoadPackage {
                     val seekBar =
                         it.thisObject.objectHelper()
                             .getObjectOrNullAs<SeekBar>("seekBar")
+                    seekBar?.setPadding(5.dp, 0.dp, 5.dp, 0.dp)
                     if (Build.VERSION.SDK_INT > Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
                         seekBar?.progressDrawable = SquigglyProgress().also { squigglyProgress ->
                             squigglyProgress.waveLength =
