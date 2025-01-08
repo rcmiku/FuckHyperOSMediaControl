@@ -5,6 +5,7 @@ import android.content.Context
 import android.graphics.Color
 import android.graphics.ColorMatrix
 import android.graphics.ColorMatrixColorFilter
+import android.graphics.Outline
 import android.graphics.Paint
 import android.graphics.RenderEffect
 import android.graphics.Shader
@@ -15,6 +16,8 @@ import android.media.session.PlaybackState.CustomAction
 import android.os.Build
 import android.os.Handler
 import android.os.Looper
+import android.view.View
+import android.view.ViewOutlineProvider
 import android.widget.ImageView
 import android.widget.SeekBar
 import android.widget.TextView
@@ -199,6 +202,26 @@ class MainHook : IXposedHookZygoteInit, IXposedHookLoadPackage {
                             val loadDrawable = artwork?.loadDrawable(context)
 
                             if (loadDrawable != null && mIsArtworkUpdate == true) {
+                                if (Build.VERSION.SDK_INT == Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+                                    val albumView = mMediaViewHolder!!.objectHelper()
+                                        .getObjectOrNullAs<ImageView>("albumView")
+
+                                    albumView?.outlineProvider = object : ViewOutlineProvider() {
+                                        override fun getOutline(view: View, outline: Outline) {
+                                            val clip = 2.dp
+                                            outline.setRoundRect(
+                                                clip,
+                                                clip,
+                                                view.width - clip,
+                                                view.height - clip,
+                                                8.dp.toFloat()
+                                            )
+                                            view.elevation = 10.dp.toFloat()
+                                            view.foreground.alpha = 0
+                                            view.setClipToOutline(true)
+                                        }
+                                    }
+                                }
                                 Executors.newSingleThreadExecutor().execute {
                                     val bitmap = drawableToBitmap(loadDrawable)
                                     val processedBitmap = runCatching {
