@@ -9,7 +9,6 @@ import android.graphics.Paint
 import android.graphics.RenderEffect
 import android.graphics.Shader
 import android.graphics.drawable.BitmapDrawable
-import android.graphics.drawable.Drawable
 import android.graphics.drawable.Icon
 import android.media.session.PlaybackState.CustomAction
 import android.os.Build
@@ -20,7 +19,6 @@ import android.view.ViewOutlineProvider
 import android.widget.ImageView
 import android.widget.SeekBar
 import com.github.kyuubiran.ezxhelper.ClassUtils.loadClassOrNull
-import com.github.kyuubiran.ezxhelper.ClassUtils.newInstance
 import com.github.kyuubiran.ezxhelper.EzXHelper
 import com.github.kyuubiran.ezxhelper.EzXHelper.moduleRes
 import com.github.kyuubiran.ezxhelper.HookFactory.`-Static`.createAfterHook
@@ -28,6 +26,7 @@ import com.github.kyuubiran.ezxhelper.HookFactory.`-Static`.createBeforeHook
 import com.github.kyuubiran.ezxhelper.Log
 import com.github.kyuubiran.ezxhelper.ObjectHelper.Companion.objectHelper
 import com.github.kyuubiran.ezxhelper.finders.MethodFinder.`-Static`.methodFinder
+import com.rcmiku.media.control.tweak.drawable.SquigglyProgress
 import com.rcmiku.media.control.tweak.utils.AppUtils.blur
 import com.rcmiku.media.control.tweak.utils.AppUtils.dp
 import com.rcmiku.media.control.tweak.utils.AppUtils.drawableToBitmap
@@ -93,6 +92,12 @@ class MainHook : IXposedHookZygoteInit, IXposedHookLoadPackage {
                     else
                         loadClassOrNull("com.android.systemui.media.controls.models.player.MediaViewHolder")
 
+                val seekBarObserver =
+                    if (Build.VERSION.SDK_INT > Build.VERSION_CODES.UPSIDE_DOWN_CAKE)
+                        loadClassOrNull("com.android.systemui.media.controls.ui.binder.SeekBarObserver")
+                    else
+                        loadClassOrNull("com.android.systemui.media.controls.models.player.SeekBarObserver")
+
                 val playerTwoCircleView =
                     if (Build.VERSION.SDK_INT > Build.VERSION_CODES.UPSIDE_DOWN_CAKE)
                         loadClassOrNull("com.miui.systemui.notification.media.PlayerTwoCircleView")
@@ -109,6 +114,29 @@ class MainHook : IXposedHookZygoteInit, IXposedHookLoadPackage {
                         packageName = it.args[0] as String
                     }
 
+                seekBarObserver?.methodFinder()?.filterByName("onChanged")?.firstOrNull()
+                    ?.createAfterHook {
+                        mMediaViewHolder?.let { holder ->
+                            val seekBar =
+                                holder.objectHelper().getObjectOrNullAs<SeekBar>("seekBar")
+                            if (seekBar != null) {
+                                val playing =
+                                    it.args[0].objectHelper().getObjectOrNull("playing") as Boolean
+                                val scrubbing =
+                                    it.args[0].objectHelper()
+                                        .getObjectOrNull("scrubbing") as Boolean
+                                val seekAvailable =
+                                    it.args[0].objectHelper()
+                                        .getObjectOrNull("seekAvailable") as Boolean
+                                val squigglyProgress = seekBar.progressDrawable as? SquigglyProgress
+                                squigglyProgress?.let { progress ->
+                                    progress.animate = playing && !scrubbing
+                                    progress.transitionEnabled = !seekAvailable
+                                }
+                            }
+                        }
+                    }
+
                 mediaViewHolder?.constructors?.firstOrNull()?.createAfterHook {
                     val seekBar =
                         it.thisObject.objectHelper()
@@ -117,22 +145,27 @@ class MainHook : IXposedHookZygoteInit, IXposedHookLoadPackage {
                         it.thisObject.objectHelper()
                             .getObjectOrNullAs<ImageView>("mediaBg")
                     seekBar?.setPadding(5.dp, 0.dp, 5.dp, 0.dp)
-                    if (Build.VERSION.SDK_INT == Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
-                        seekBar?.progressDrawable =
-                            loadClassOrNull("com.android.systemui.media.controls.ui.SquigglyProgress")?.let { squigglyProgress ->
-                                newInstance(
-                                    squigglyProgress
-                                )
-                            } as Drawable
+                    seekBar?.progressDrawable = SquigglyProgress().also { squigglyProgress ->
+                        squigglyProgress.waveLength =
+                            moduleRes.getDimension(R.dimen.media_seekbar_progress_wavelength)
+                        squigglyProgress.lineAmplitude =
+                            moduleRes.getDimension(R.dimen.media_seekbar_progress_amplitude)
+                        squigglyProgress.phaseSpeed =
+                            moduleRes.getDimension(R.dimen.media_seekbar_progress_phase)
+                        squigglyProgress.strokeWidth =
+                            moduleRes.getDimension(R.dimen.media_seekbar_progress_stroke_width)
+                        squigglyProgress.animate = false
+                        squigglyProgress.transitionEnabled = false
+                        mediaBg?.colorFilter = colorFilter
+                        mediaBg?.setRenderEffect(blur)
+                        seekBar?.thumb =
+                            moduleRes.getDrawable(R.drawable.ic_thumb, moduleRes.newTheme())
                     }
-                    mediaBg?.colorFilter = colorFilter
-                    mediaBg?.setRenderEffect(blur)
-                    seekBar?.thumb =
-                        moduleRes.getDrawable(R.drawable.ic_thumb, moduleRes.newTheme())
                 }
 
                 notificationSettingsManager?.constructors?.firstOrNull()?.createAfterHook {
-                    it.thisObject.objectHelper().setObject("mMediaAppWhiteList", ArrayList<Any>())
+                    it.thisObject.objectHelper()
+                        .setObject("mMediaAppWhiteList", ArrayList<Any>())
                     it.thisObject.objectHelper()
                         .setObject("mHiddenCustomActionsList", ArrayList<Any>())
                 }
@@ -187,11 +220,13 @@ class MainHook : IXposedHookZygoteInit, IXposedHookLoadPackage {
                         it.thisObject.objectHelper().setObject("mRadius", 0f)
                     }
 
-                playerTwoCircleView?.methodFinder()?.filterByName("setBackground")?.firstOrNull()
+                playerTwoCircleView?.methodFinder()?.filterByName("setBackground")
+                    ?.firstOrNull()
                     ?.createBeforeHook {
                         if (mMediaViewHolder != null) {
                             val view = (it.thisObject as ImageView)
-                            val context = AndroidAppHelper.currentApplication().applicationContext
+                            val context =
+                                AndroidAppHelper.currentApplication().applicationContext
                             val loadDrawable = artwork?.loadDrawable(context)
                             if (loadDrawable != null) {
 
