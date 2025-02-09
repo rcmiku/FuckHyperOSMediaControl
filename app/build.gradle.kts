@@ -14,8 +14,8 @@ android {
         applicationId = namespace
         minSdk = 34
         targetSdk = 35
-        versionCode = 1300
-        versionName = "1.3.0"
+        versionCode = 1400
+        versionName = "1.4.0"
     }
     signingConfigs {
         register("release") {
