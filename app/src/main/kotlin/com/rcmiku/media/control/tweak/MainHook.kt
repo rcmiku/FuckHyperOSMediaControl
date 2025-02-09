@@ -1,7 +1,6 @@
 package com.rcmiku.media.control.tweak
 
 import android.app.AndroidAppHelper
-import android.graphics.Color
 import android.graphics.ColorMatrix
 import android.graphics.ColorMatrixColorFilter
 import android.graphics.Outline
@@ -129,9 +128,9 @@ class MainHook : IXposedHookZygoteInit, IXposedHookLoadPackage {
                                     it.args[0].objectHelper()
                                         .getObjectOrNull("seekAvailable") as Boolean
                                 val squigglyProgress = seekBar.progressDrawable as? SquigglyProgress
-                                squigglyProgress?.let { progress ->
-                                    progress.animate = playing && !scrubbing
-                                    progress.transitionEnabled = !seekAvailable
+                                squigglyProgress?.apply {
+                                    animate = playing && !scrubbing
+                                    transitionEnabled = !seekAvailable
                                 }
                             }
                         }
@@ -145,22 +144,26 @@ class MainHook : IXposedHookZygoteInit, IXposedHookLoadPackage {
                         it.thisObject.objectHelper()
                             .getObjectOrNullAs<ImageView>("mediaBg")
                     seekBar?.setPadding(5.dp, 0.dp, 5.dp, 0.dp)
-                    seekBar?.progressDrawable = SquigglyProgress().also { squigglyProgress ->
-                        squigglyProgress.waveLength =
-                            moduleRes.getDimension(R.dimen.media_seekbar_progress_wavelength)
-                        squigglyProgress.lineAmplitude =
-                            moduleRes.getDimension(R.dimen.media_seekbar_progress_amplitude)
-                        squigglyProgress.phaseSpeed =
-                            moduleRes.getDimension(R.dimen.media_seekbar_progress_phase)
-                        squigglyProgress.strokeWidth =
-                            moduleRes.getDimension(R.dimen.media_seekbar_progress_stroke_width)
-                        squigglyProgress.animate = false
-                        squigglyProgress.transitionEnabled = false
-                        mediaBg?.colorFilter = colorFilter
-                        mediaBg?.setRenderEffect(blur)
-                        seekBar?.thumb =
-                            moduleRes.getDrawable(R.drawable.ic_thumb, moduleRes.newTheme())
+                    val thumb = moduleRes.getDrawable(R.drawable.ic_thumb, moduleRes.newTheme())
+                    val context = AndroidAppHelper.currentApplication().applicationContext
+                    val drawableToBitmap = drawableToBitmap(thumb)
+                    seekBar?.thumb = BitmapDrawable(
+                        context.resources, drawableToBitmap.scale(4.dp, 16.dp)
+                    )
+                    seekBar?.progressDrawable = SquigglyProgress().apply {
+                        waveLength =
+                            20.dp.toFloat()
+                        lineAmplitude =
+                            2.dp.toFloat()
+                        phaseSpeed =
+                            8.dp.toFloat()
+                        strokeWidth =
+                            2.dp.toFloat()
+                        animate = false
+                        transitionEnabled = false
                     }
+                    mediaBg?.colorFilter = colorFilter
+                    mediaBg?.setRenderEffect(blur)
                 }
 
                 notificationSettingsManager?.constructors?.firstOrNull()?.createAfterHook {
@@ -178,7 +181,13 @@ class MainHook : IXposedHookZygoteInit, IXposedHookLoadPackage {
                         val appIcon =
                             mMediaViewHolder!!.objectHelper()
                                 .getObjectOrNullAs<ImageView>("appIcon")
-                        appIcon?.drawable?.setTint(Color.TRANSPARENT)
+                        val context =
+                            AndroidAppHelper.currentApplication().applicationContext
+                        val packageName =
+                            it.args[0].objectHelper().getObjectOrNull("packageName") as String
+                        val icon =
+                            packageName.let { pkg -> context.packageManager.getApplicationIcon(pkg) }
+                        appIcon?.setImageDrawable(icon)
                         artwork =
                             it.args[0].objectHelper().getObjectOrNullAs<Icon>("artwork")
                     }

@@ -20,7 +20,6 @@ import android.animation.AnimatorListenerAdapter
 import android.animation.ValueAnimator
 import android.content.res.ColorStateList
 import android.graphics.Canvas
-import android.graphics.Color
 import android.graphics.ColorFilter
 import android.graphics.Paint
 import android.graphics.Path
@@ -28,6 +27,7 @@ import android.graphics.PixelFormat
 import android.graphics.drawable.Drawable
 import android.os.SystemClock
 import android.view.animation.PathInterpolator
+import com.rcmiku.media.control.tweak.utils.ColorUtil
 import com.rcmiku.media.control.tweak.utils.MathUtil.lerp
 import com.rcmiku.media.control.tweak.utils.MathUtil.lerpInv
 import com.rcmiku.media.control.tweak.utils.MathUtil.lerpInvSat
@@ -37,7 +37,7 @@ import kotlin.math.cos
 
 private const val TWO_PI = (PI * 2f).toFloat()
 
-internal const val DISABLED_ALPHA = 77
+private const val DISABLED_ALPHA = 77
 
 class SquigglyProgress : Drawable() {
 
@@ -256,14 +256,8 @@ class SquigglyProgress : Drawable() {
     }
 
     private fun updateColors(tintColor: Int, alpha: Int) {
-        wavePaint.color =
-            Color.argb(alpha, Color.red(tintColor), Color.green(tintColor), Color.blue(tintColor))
-        val disabledAlpha = (DISABLED_ALPHA * (alpha / 255f)).toInt()
-        linePaint.color = Color.argb(
-            disabledAlpha,
-            Color.red(tintColor),
-            Color.green(tintColor),
-            Color.blue(tintColor)
-        )
+        wavePaint.color = ColorUtil.setAlphaComponent(tintColor, alpha)
+        linePaint.color =
+            ColorUtil.setAlphaComponent(tintColor, (DISABLED_ALPHA * (alpha / 255f)).toInt())
     }
 }
